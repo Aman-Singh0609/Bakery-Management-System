@@ -1,0 +1,77 @@
+services:
+  postgres:
+    image: amy_bakery_postgres
+    build:
+      context: ./database
+    container_name: amy_bakery_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: aditya
+      POSTGRES_PASSWORD: aditya
+      POSTGRES_DB: indianbakery
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aditya -d indianbakery"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: amy_bakery_rabbitmq
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+
+  backend:
+    image: amy_bakery_backend
+    build:
+      context: ./backend
+    container_name: amy_bakery_backend
+    restart: always
+    environment:
+      PORT: 8000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: aditya
+      DB_PASSWORD: aditya
+      DB_NAME: indianbakery
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  frontend:
+    image: amy_bakery_frontend
+    build:
+      context: ./frontend
+    container_name: amy_bakery_frontend
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

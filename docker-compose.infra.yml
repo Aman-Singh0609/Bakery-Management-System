@@ -1,0 +1,45 @@
+version: '3.8'
+
+# Minimal docker-compose for local development
+# Only runs the infrastructure services (DB + Message Broker)
+# Run the backend and frontend with npm locally for stability
+
+services:
+  postgres:
+    image: amy_bakery_postgres
+    build:
+      context: ./database
+    container_name: amy_bakery_postgres
+    environment:
+      POSTGRES_USER: aditya
+      POSTGRES_PASSWORD: aditya
+      POSTGRES_DB: indianbakery
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aditya -d indianbakery"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: amy_bakery_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

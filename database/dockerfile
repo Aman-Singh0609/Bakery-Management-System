@@ -1,0 +1,8 @@
+# Use the official PostgreSQL 13 base image
+FROM postgres:13
+
+# We will supply POSTGRES_USER, POSTGRES_PASSWORD, and POSTGRES_DB 
+# securely at runtime via docker-compose or Kubernetes secrets.
+
+# Copy the initialization SQL script into the image
+COPY init.sql /docker-entrypoint-initdb.d/
