@@ -1,0 +1,117 @@
+@import '@fontsource-variable/bricolage-grotesque';
+@import '@fontsource-variable/figtree';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-paper font-sans text-[15px] leading-relaxed text-cocoa antialiased;
+  }
+  h1, h2, h3 {
+    @apply font-display tracking-tight text-cocoa;
+    font-variation-settings: 'wdth' 90;
+  }
+  :focus-visible {
+    @apply outline outline-2 outline-offset-2 outline-berry;
+  }
+  ::selection {
+    @apply bg-box;
+  }
+
+  /* Subtle custom scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { @apply rounded-full bg-line; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-cocoa-muted; }
+}
+
+@layer components {
+  /* The cake-box stripe: the one decorative motif, used sparingly. */
+  .ribbon {
+    background-image: repeating-linear-gradient(
+      -45deg,
+      #f4c9d2 0 10px,
+      #fff8f6 10px 20px
+    );
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-berry text-white shadow-sm shadow-berry/20 hover:bg-berry-dark hover:shadow-md hover:shadow-berry/25 active:scale-[0.98];
+  }
+  .btn-secondary {
+    @apply btn border border-line bg-white text-cocoa shadow-sm hover:border-cocoa-muted hover:shadow active:scale-[0.98];
+  }
+  .btn-ghost {
+    @apply btn px-3 text-cocoa-soft hover:bg-box-light hover:text-cocoa active:scale-[0.98];
+  }
+  .btn-danger {
+    @apply btn border border-berry/30 bg-white text-berry hover:bg-berry-light active:scale-[0.98];
+  }
+
+  .field-label {
+    @apply mb-1.5 block text-sm font-medium text-cocoa;
+  }
+  .input {
+    @apply w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-[15px] text-cocoa placeholder:text-cocoa-muted/70 transition-shadow duration-150 focus:border-berry focus:outline-none focus:ring-2 focus:ring-berry/20 disabled:bg-paper;
+  }
+  .input-error {
+    @apply border-berry ring-2 ring-berry/20;
+  }
+  .field-hint {
+    @apply mt-1 text-xs text-cocoa-muted;
+  }
+  .field-error {
+    @apply mt-1 text-xs font-medium text-berry;
+  }
+
+  .panel {
+    @apply rounded-2xl border border-line bg-white shadow-sm;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-medium transition-all duration-150;
+  }
+
+  /* Fade-up entrance for sections */
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .animate-fade-up {
+    animation: fade-up 0.5s ease both;
+  }
+
+  /* Slide-in for toasts */
+  @keyframes slide-in-right {
+    from { opacity: 0; transform: translateX(100%); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  .animate-slide-in {
+    animation: slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  /* Pulse dot for live/active states */
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.8); }
+  }
+  .animate-pulse-dot {
+    animation: pulse-dot 1.8s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

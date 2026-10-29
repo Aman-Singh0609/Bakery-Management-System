@@ -1,77 +1,58 @@
+# Full stack: PostgreSQL + API + storefront.
+#   cp .env.example .env              (then edit it)
+#   cp backend/.env.example backend/.env   (then edit it)
+#   docker compose up --build -d      ->  http://localhost:3000
 services:
   postgres:
-    image: amy_bakery_postgres
-    build:
-      context: ./database
+    image: postgres:16-alpine
     container_name: amy_bakery_postgres
-    restart: always
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: aditya
-      POSTGRES_PASSWORD: aditya
-      POSTGRES_DB: indianbakery
+      POSTGRES_USER: ${POSTGRES_USER:-amy}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the root .env file}
+      POSTGRES_DB: ${POSTGRES_DB:-amy_bakery}
+    # Only reachable from this computer, never from the network.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aditya -d indianbakery"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-amy} -d ${POSTGRES_DB:-amy_bakery}"]
+      interval: 5s
       timeout: 5s
-      retries: 10
-      start_period: 30s
-
-  rabbitmq:
-    image: rabbitmq:3-management
-    container_name: amy_bakery_rabbitmq
-    restart: always
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
-      interval: 15s
-      timeout: 10s
-      retries: 10
-      start_period: 40s
+      retries: 20
+      start_period: 10s
 
   backend:
-    image: amy_bakery_backend
     build:
       context: ./backend
     container_name: amy_bakery_backend
-    restart: always
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
     environment:
+      NODE_ENV: production
       PORT: 8000
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: aditya
-      DB_PASSWORD: aditya
-      DB_NAME: indianbakery
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      DATABASE_URL: postgresql://${POSTGRES_USER:-amy}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-amy_bakery}?schema=public
+      # Only the nginx container (on the private Docker network) may set X-Forwarded-For.
+      TRUST_PROXY: uniquelocal
+    # Published on localhost only, for debugging. Browsers go through the frontend's /api proxy.
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
 
   frontend:
-    image: amy_bakery_frontend
     build:
       context: ./frontend
     container_name: amy_bakery_frontend
-    restart: always
+    restart: unless-stopped
     ports:
-      - "3000:80"
+      - "3000:8080"
     depends_on:
       - backend
 
 volumes:
   postgres_data:
+    name: amy_bakery_data

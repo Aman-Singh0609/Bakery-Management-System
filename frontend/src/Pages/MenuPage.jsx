@@ -1,186 +1,171 @@
-import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { Cake, Home, Loader2, Search, ShoppingCart, Plus, Star } from "lucide-react";
-import axios from "axios";
-import { useCart } from "../context/CartContext";
+import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Search, SlidersHorizontal } from 'lucide-react';
+import { api, apiErrorMessage } from '../lib/api';
+import ProductCard from '../components/ProductCard';
+import { EmptyState, ErrorNote, Spinner } from '../components/Feedback';
 
-const CATEGORIES = ["All", "Bread", "Cake", "Pastry", "Cookie", "Snack"];
+const SORTS = [
+  ['featured', 'Popular'],
+  ['price_asc', 'Price: low → high'],
+  ['price_desc', 'Price: high → low'],
+  ['name', 'Name A–Z'],
+];
 
-function MenuPage() {
-    const [products, setProducts] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [searchQuery, setSearchQuery] = useState("");
-    const [activeCategory, setActiveCategory] = useState("All");
-    const [addedId, setAddedId] = useState(null);
-    const { addToCart, totalItems } = useCart();
+export default function MenuPage() {
+  const [params, setParams] = useSearchParams();
+  const category = params.get('category') || 'all';
+  const sort = params.get('sort') || 'featured';
+  const search = params.get('q') || '';
 
-    useEffect(() => {
-        const fetchProducts = async () => {
-            try {
-                const res = await axios.get("/api/listproducts");
-                setProducts(Array.isArray(res.data) ? res.data : []);
-            } catch (e) {
-                console.error("Error fetching products:", e);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchProducts();
-    }, []);
+  const [query, setQuery] = useState(search);
+  const [categories, setCategories] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-    const filtered = products.filter((p) => {
-        const matchSearch =
-            (p.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (p.category || "").toLowerCase().includes(searchQuery.toLowerCase());
-        const matchCat =
-            activeCategory === "All" || p.category === activeCategory;
-        return matchSearch && matchCat;
-    });
+  const setParam = useCallback(
+    (key, value, fallback) => {
+      const next = new URLSearchParams(params);
+      if (!value || value === fallback) next.delete(key);
+      else next.set(key, value);
+      setParams(next, { replace: true });
+    },
+    [params, setParams],
+  );
 
-    const handleAddToCart = (product) => {
-        addToCart(product);
-        setAddedId(product.id);
-        setTimeout(() => setAddedId(null), 1200);
-    };
+  useEffect(() => {
+    api.get('/categories').then(({ data }) => setCategories(data.data)).catch(() => {});
+  }, []);
 
-    return (
-        <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white">
-            {/* Header */}
-            <header className="bg-gradient-to-r from-rose-600 to-amber-500 py-4 px-4 md:px-8 shadow-lg sticky top-0 z-30">
-                <div className="mx-auto flex max-w-6xl items-center justify-between">
-                    <div className="flex items-center gap-2 text-black">
-                        <Cake className="h-6 w-6" />
-                        <h1 className="font-serif text-xl font-bold">Sweet Dreams Bakery</h1>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <Link to="/">
-                            <button className="flex items-center gap-2 px-3 py-2 rounded-full bg-white/20 hover:bg-white/30 text-black transition-colors text-sm">
-                                <Home className="h-4 w-4" /> Home
-                            </button>
-                        </Link>
-                        <Link to="/cart">
-                            <button className="relative flex items-center gap-2 px-4 py-2 rounded-full bg-white text-rose-600 font-medium hover:bg-rose-50 transition-colors text-sm shadow">
-                                <ShoppingCart className="h-4 w-4" />
-                                Cart
-                                {totalItems > 0 && (
-                                    <span className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
-                                        {totalItems}
-                                    </span>
-                                )}
-                            </button>
-                        </Link>
-                    </div>
-                </div>
-            </header>
+  // Debounce the search box into the URL.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (query.trim() !== search) setParam('q', query.trim(), '');
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query, search, setParam]);
 
-            {/* Hero Banner */}
-            <section className="bg-gradient-to-r from-rose-500 to-amber-400 py-10 px-4 text-center">
-                <h2 className="font-serif text-3xl md:text-4xl font-bold text-white mb-2">
-                    🍞 Our Bakery Menu
-                </h2>
-                <p className="text-white/90 text-lg">
-                    Fresh baked goods made with love every day
-                </p>
-            </section>
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const { data } = await api.get('/products', {
+        params: { limit: 100, sort, ...(category !== 'all' ? { category } : {}), ...(search ? { search } : {}) },
+      });
+      setProducts(data.data);
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not load the menu.'));
+    } finally {
+      setLoading(false);
+    }
+  }, [category, sort, search]);
 
-            <main className="mx-auto max-w-6xl py-8 px-4 md:px-8">
-                {/* Filters */}
-                <div className="flex flex-col sm:flex-row gap-4 mb-8 items-center justify-between">
-                    <div className="relative w-full max-w-sm">
-                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                        <input
-                            type="search"
-                            placeholder="Search items..."
-                            className="w-full rounded-full border border-gray-300 pl-9 pr-4 py-2 focus:border-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-200"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        {CATEGORIES.map((cat) => (
-                            <button
-                                key={cat}
-                                onClick={() => setActiveCategory(cat)}
-                                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${activeCategory === cat
-                                        ? "bg-rose-500 text-white shadow-md"
-                                        : "bg-white text-gray-600 border border-gray-300 hover:border-rose-400"
-                                    }`}
-                            >
-                                {cat}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+  useEffect(() => {
+    load();
+  }, [load]);
 
-                {loading ? (
-                    <div className="flex h-64 items-center justify-center">
-                        <Loader2 className="h-8 w-8 animate-spin text-rose-500" />
-                        <span className="ml-2 text-rose-600 text-lg">Loading menu...</span>
-                    </div>
-                ) : filtered.length === 0 ? (
-                    <div className="h-64 flex items-center justify-center text-gray-400 text-lg">
-                        No items found.
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {filtered.map((product) => (
-                            <div
-                                key={product.id}
-                                className="group bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col"
-                            >
-                                <div className="relative h-44 overflow-hidden">
-                                    <img
-                                        src={product.image || "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&q=80"}
-                                        alt={product.name}
-                                        className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                    />
-                                    <span className="absolute top-2 left-2 bg-white/90 text-rose-600 text-xs font-semibold px-2.5 py-1 rounded-full shadow">
-                                        {product.category}
-                                    </span>
-                                    {product.stock < 10 && (
-                                        <span className="absolute top-2 right-2 bg-red-500 text-white text-xs font-semibold px-2 py-1 rounded-full">
-                                            Low Stock
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="p-4 flex flex-col flex-1">
-                                    <h3 className="font-serif text-lg font-semibold text-gray-800 leading-tight">
-                                        {product.name}
-                                    </h3>
-                                    <div className="flex items-center gap-1 mt-1 mb-3">
-                                        {[...Array(5)].map((_, i) => (
-                                            <Star key={i} className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                                        ))}
-                                        <span className="text-xs text-gray-500 ml-1">(4.8)</span>
-                                    </div>
-                                    <div className="mt-auto flex items-center justify-between">
-                                        <span className="text-xl font-bold text-rose-600">₹{product.price}</span>
-                                        <button
-                                            onClick={() => handleAddToCart(product)}
-                                            disabled={product.stock === 0}
-                                            className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium transition-all duration-300 ${addedId === product.id
-                                                    ? "bg-green-500 text-white scale-95"
-                                                    : product.stock === 0
-                                                        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                                                        : "bg-rose-500 text-white hover:bg-rose-600 hover:shadow-md active:scale-95"
-                                                }`}
-                                        >
-                                            <Plus className="h-4 w-4" />
-                                            {addedId === product.id ? "Added!" : product.stock === 0 ? "Out of Stock" : "Add to Cart"}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </main>
+  return (
+    <div className="mx-auto max-w-page px-4 pt-10 sm:px-6">
+      <div className="animate-fade-up">
+        <p className="mb-1 text-sm font-semibold uppercase tracking-widest text-berry">Today's selection</p>
+        <h1 className="text-4xl font-extrabold sm:text-5xl">Today&apos;s menu</h1>
+        <p className="mt-2 text-cocoa-soft">Everything here was baked this morning. Stock updates as orders come in.</p>
+      </div>
 
-            <footer className="bg-rose-700 py-6 px-4 text-center text-white/80 mt-10">
-                <p>© 2024 Sweet Dreams Bakery. All rights reserved.</p>
-            </footer>
+      {/* ── Sticky filter bar ── */}
+      <div className="sticky top-16 z-30 -mx-4 mt-8 border-b border-line bg-paper/95 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          {/* Category tabs */}
+          <div className="flex gap-2 overflow-x-auto pb-1 lg:pb-0" role="tablist" aria-label="Categories">
+            {[{ slug: 'all', name: 'Everything' }, ...categories].map((item) => {
+              const active = category === item.slug;
+              return (
+                <button
+                  key={item.slug}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setParam('category', item.slug, 'all')}
+                  className={`chip transition-all duration-150 ${
+                    active
+                      ? 'border-cocoa bg-cocoa text-white shadow-sm'
+                      : 'border-line bg-white text-cocoa-soft hover:border-cocoa-muted hover:shadow-sm'
+                  }`}
+                >
+                  {item.name}
+                  {item.productCount !== undefined && (
+                    <span className={`text-[11px] ${active ? 'text-white/70' : 'text-cocoa-muted'}`}>
+                      {item.productCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Search + Sort */}
+          <div className="flex gap-2 lg:ml-auto">
+            <label className="relative flex-1 lg:w-64">
+              <span className="sr-only">Search the menu</span>
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cocoa-muted" />
+              <input
+                type="search"
+                className="input rounded-full py-2 pl-9 pr-4"
+                placeholder="Search cakes, puffs…"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
+            <label className="relative">
+              <span className="sr-only">Sort by</span>
+              <SlidersHorizontal className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cocoa-muted" />
+              <select
+                className="input appearance-none rounded-full py-2 pl-9 pr-8"
+                value={sort}
+                onChange={(event) => setParam('sort', event.target.value, 'featured')}
+              >
+                {SORTS.map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
         </div>
-    );
-}
+      </div>
 
-export default MenuPage;
+      {/* ── Product grid ── */}
+      <div className="mt-8 pb-16">
+        {error ? (
+          <ErrorNote onRetry={load}>{error}</ErrorNote>
+        ) : loading && products.length === 0 ? (
+          <Spinner label="Loading the menu" />
+        ) : products.length === 0 ? (
+          <EmptyState
+            title={search ? `Nothing matches "${search}"` : 'Nothing in this section today'}
+            action={
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => { setQuery(''); setParams({}, { replace: true }); }}
+              >
+                Show everything
+              </button>
+            }
+          />
+        ) : (
+          <>
+            <p className="mb-6 text-sm text-cocoa-muted">
+              {products.length} item{products.length !== 1 ? 's' : ''}{search ? ` matching "${search}"` : ''}
+            </p>
+            <div className={`grid grid-cols-2 gap-x-4 gap-y-8 sm:gap-x-6 sm:gap-y-10 lg:grid-cols-3 xl:grid-cols-4 transition-opacity duration-200 ${loading ? 'opacity-50' : 'opacity-100'}`}>
+              {products.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

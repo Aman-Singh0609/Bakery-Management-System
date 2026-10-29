@@ -15,48 +15,107 @@ spec:
       labels:
         app: backend
     spec:
+      securityContext:
+        runAsNonRoot: true
       containers:
         - name: backend
-          image: amy_bakery_backend
+          image: amy_bakery_backend:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
           env:
+            - name: NODE_ENV
+              value: production
             - name: PORT
               value: "8000"
-            - name: DB_HOST
-              value: "postgres"
-            - name: DB_PORT
-              value: "5432"
-            - name: DB_USER
+            - name: CORS_ORIGINS
+              value: "https://bakery.local"
+            - name: APP_URL
+              value: "https://bakery.local"
+            - name: COOKIE_SECURE
+              value: "true"
+            # Only the in-cluster ingress controller may set X-Forwarded-For.
+            - name: TRUST_PROXY
+              value: "uniquelocal"
+            - name: ADMIN_EMAIL
               valueFrom:
                 secretKeyRef:
                   name: amy-bakery-secret
-                  key: DB_USER
-            - name: DB_PASSWORD
+                  key: ADMIN_EMAIL
+                  optional: true
+            - name: ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: amy-bakery-secret
-                  key: DB_PASSWORD
-            - name: DB_NAME
+                  key: ADMIN_PASSWORD
+                  optional: true
+            - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: amy-bakery-secret
-                  key: DB_NAME
-            - name: RABBITMQ_HOST
-              value: "rabbitmq"
-            - name: RABBITMQ_PORT
-              value: "5672"
-            - name: RABBITMQ_DEFAULT_USER
+                  key: DATABASE_URL
+            - name: JWT_ACCESS_SECRET
               valueFrom:
                 secretKeyRef:
                   name: amy-bakery-secret
-                  key: RABBITMQ_USER
-            - name: RABBITMQ_DEFAULT_PASS
+                  key: JWT_ACCESS_SECRET
+            - name: JWT_REFRESH_SECRET
               valueFrom:
                 secretKeyRef:
                   name: amy-bakery-secret
-                  key: RABBITMQ_PASS
+                  key: JWT_REFRESH_SECRET
+            - name: RAZORPAY_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: amy-bakery-secret
+                  key: RAZORPAY_KEY_ID
+                  optional: true
+            - name: RAZORPAY_KEY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: amy-bakery-secret
+                  key: RAZORPAY_KEY_SECRET
+                  optional: true
+            - name: RAZORPAY_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: amy-bakery-secret
+                  key: RAZORPAY_WEBHOOK_SECRET
+                  optional: true
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
 
 ---
 apiVersion: v1

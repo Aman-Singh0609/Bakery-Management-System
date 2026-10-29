@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (typecheck, tests, API smoke test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql://test:test@localhost:5432/test?schema=public
+      JWT_ACCESS_SECRET: ci-access-secret-at-least-32-characters-long
+      JWT_REFRESH_SECRET: ci-refresh-secret-at-least-32-characters-long
+      CORS_ORIGINS: http://localhost:3000
+      ADMIN_EMAIL: admin@ci.local
+      ADMIN_PASSWORD: CiAdminPassword2026
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test -d test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npx prisma validate
+      - run: npx prisma generate
+      - run: npx prisma migrate deploy
+      - run: npm run typecheck
+      - run: npm test
+        env:
+          NODE_ENV: test
+      - run: npm run build
+      - run: node dist/db/seed.js
+      - name: Start API
+        run: |
+          NODE_ENV=production COOKIE_SECURE=false LOG_LEVEL=warn node dist/server.js &
+          for i in $(seq 1 30); do curl -sf http://localhost:8000/health/ready && break; sleep 1; done
+      - run: node scripts/smoke-test.mjs http://localhost:8000
+
+  frontend:
+    name: Frontend (lint + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Scans the current tree. Once old commits containing secrets are purged,
+      # switch to a full-history scan (`fetch-depth: 0` + gitleaks-action).
+      - name: Scan current tree for secrets
+        run: >-
+          docker run --rm
+          -v "${{ github.workspace }}:/repo"
+          zricethezav/gitleaks:v8.30.1
+          detect --source=/repo --no-git --redact --verbose

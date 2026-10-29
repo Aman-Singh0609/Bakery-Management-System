@@ -1,45 +1,26 @@
-version: '3.8'
-
-# Minimal docker-compose for local development
-# Only runs the infrastructure services (DB + Message Broker)
-# Run the backend and frontend with npm locally for stability
-
+# Database only, for local development. Run the API with `npm run dev` in ./backend
+# and the storefront with `npm run dev` in ./frontend.
+#   docker compose -f docker-compose.infra.yml up -d
+# Do not run this and docker-compose.yml at the same time (both use port 5432).
 services:
   postgres:
-    image: amy_bakery_postgres
-    build:
-      context: ./database
+    image: postgres:16-alpine
     container_name: amy_bakery_postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: aditya
-      POSTGRES_PASSWORD: aditya
-      POSTGRES_DB: indianbakery
+      POSTGRES_USER: ${POSTGRES_USER:-amy}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the root .env file}
+      POSTGRES_DB: ${POSTGRES_DB:-amy_bakery}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aditya -d indianbakery"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-amy} -d ${POSTGRES_DB:-amy_bakery}"]
+      interval: 5s
       timeout: 5s
-      retries: 5
-
-  rabbitmq:
-    image: rabbitmq:3-management
-    container_name: amy_bakery_rabbitmq
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      retries: 20
 
 volumes:
   postgres_data:
+    name: amy_bakery_data

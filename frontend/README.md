@@ -1,12 +1,14 @@
-# React + Vite
+# Sweet Dreams Bakery storefront
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 + Vite storefront and staff dashboard. Setup, architecture and API docs are in the
+[project README](../README.md).
 
-Currently, two official plugins are available:
+```bash
+npm install
+npm run dev     # http://localhost:3000, proxies /api to http://localhost:8000
+npm run lint
+npm run build
+```
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript and enable type-aware lint rules. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Shop details (name, address, phone, hours) are in `src/lib/store.js`. Colours and fonts are
+defined in `tailwind.config.js` and `src/index.css`.

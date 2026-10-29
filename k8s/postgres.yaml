@@ -1,3 +1,16 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -7,6 +20,8 @@ metadata:
     app: postgres
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: postgres
@@ -15,12 +30,11 @@ spec:
       labels:
         app: postgres
     spec:
+      securityContext:
+        fsGroup: 999
       containers:
         - name: postgres
-          # In a real scenario you would build and push the custom image to a registry.
-          # Here we use the standard image and assume init.sql is mounted or we use the custom image if built.
-          # Assuming the image is built locally as amy_bakery_postgres
-          image: amy_bakery_postgres
+          image: postgres:16-alpine
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5432
@@ -29,23 +43,41 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: amy-bakery-secret
-                  key: DB_USER
+                  key: POSTGRES_USER
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: amy-bakery-secret
-                  key: DB_PASSWORD
+                  key: POSTGRES_PASSWORD
             - name: POSTGRES_DB
               valueFrom:
                 secretKeyRef:
                   name: amy-bakery-secret
-                  key: DB_NAME
+                  key: POSTGRES_DB
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
       volumes:
         - name: postgres-data
-          emptyDir: {} # For development purposes
+          persistentVolumeClaim:
+            claimName: postgres-data
 
 ---
 apiVersion: v1
